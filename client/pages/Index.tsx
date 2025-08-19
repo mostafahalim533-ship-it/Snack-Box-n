@@ -435,7 +435,7 @@ export default function Index() {
         }
 
         // Ensure DOM protection is active before checking for embeds
-        if (!domProtectionActive) {
+        if (!domProtectionStateRef.current.isActive) {
           createDOMProtection();
         }
 
