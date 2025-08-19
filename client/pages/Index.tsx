@@ -567,13 +567,9 @@ export default function Index() {
       initializationTimers.forEach(timer => clearTimeout(timer));
 
       // Restore DOM methods if protection is still active
-      if (domProtectionActive) {
+      if (domProtectionStateRef.current.isActive && domProtectionStateRef.current.restoreFunction) {
         try {
-          // Only restore if we have the function reference
-          const restoreFunction = createDOMProtection();
-          if (typeof restoreFunction === 'function') {
-            restoreFunction();
-          }
+          domProtectionStateRef.current.restoreFunction();
         } catch (e) {
           console.warn('Error restoring DOM methods on cleanup:', e);
         }
