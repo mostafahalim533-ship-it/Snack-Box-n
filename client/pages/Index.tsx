@@ -482,16 +482,30 @@ export default function Index() {
           }
         };
 
-        // Attempt to render with try-catch to prevent uncaught errors
-        tiktokEmbed.lib.render();
+        // Additional protection: wrap the render call with comprehensive error handling
+        const renderWithProtection = () => {
+          try {
+            // Double-check that the library is still available
+            if (!windowObj.tiktokEmbed?.lib?.render) {
+              return false;
+            }
 
-        // Restore original methods after a brief delay
-        setTimeout(() => {
-          document.querySelectorAll = originalQuerySelectorAll;
-          document.getElementsByClassName = originalGetElementsByClassName;
-        }, 100);
+            // Call the render function with additional safety
+            windowObj.tiktokEmbed.lib.render();
+            return true;
+          } catch (renderError) {
+            console.warn('TikTok render call failed:', renderError);
+            return false;
+          }
+        };
 
-        return true;
+        const renderSuccess = renderWithProtection();
+
+        if (renderSuccess) {
+          console.log('TikTok embeds rendered successfully with protection');
+        }
+
+        return renderSuccess;
 
       } catch (error) {
         console.warn("TikTok render attempt failed safely:", error);
