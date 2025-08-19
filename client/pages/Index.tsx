@@ -270,6 +270,53 @@ export default function Index() {
           return;
         }
 
+        // Apply global DOM method protection before loading script
+        const setupDOMProtection = () => {
+          // Store original methods
+          const originalQSA = document.querySelectorAll;
+          const originalGEBCN = document.getElementsByClassName;
+          const originalGEBTN = document.getElementsByTagName;
+
+          // Protected querySelectorAll
+          document.querySelectorAll = function(selector) {
+            try {
+              const result = originalQSA.call(document, selector);
+              return result || [];
+            } catch (e) {
+              return [];
+            }
+          };
+
+          // Protected getElementsByClassName
+          document.getElementsByClassName = function(className) {
+            try {
+              const result = originalGEBCN.call(document, className);
+              return result || [];
+            } catch (e) {
+              return [];
+            }
+          };
+
+          // Protected getElementsByTagName
+          document.getElementsByTagName = function(tagName) {
+            try {
+              const result = originalGEBTN.call(document, tagName);
+              return result || [];
+            } catch (e) {
+              return [];
+            }
+          };
+
+          return () => {
+            // Restore original methods
+            document.querySelectorAll = originalQSA;
+            document.getElementsByClassName = originalGEBCN;
+            document.getElementsByTagName = originalGEBTN;
+          };
+        };
+
+        const restoreDOM = setupDOMProtection();
+
         // Create new script without cache-busting to avoid repeated failures
         const script = document.createElement("script");
         script.src = "https://www.tiktok.com/embed.js";
