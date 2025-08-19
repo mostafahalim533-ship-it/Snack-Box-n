@@ -351,14 +351,18 @@ export default function Index() {
       };
 
       // Return restoration function
-      return () => {
-        domProtectionActive = false;
+      const restoreFunction = () => {
+        domProtectionStateRef.current.isActive = false;
+        domProtectionStateRef.current.restoreFunction = null;
         document.querySelectorAll = original.querySelectorAll;
         document.getElementsByClassName = original.getElementsByClassName;
         document.getElementsByTagName = original.getElementsByTagName;
         document.getElementById = original.getElementById;
         document.querySelector = original.querySelector;
       };
+
+      domProtectionStateRef.current.restoreFunction = restoreFunction;
+      return restoreFunction;
     };
 
     const loadTikTokScript = () => {
