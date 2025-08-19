@@ -138,4 +138,15 @@ const App = () => {
   );
 };
 
-createRoot(document.getElementById("root")!).render(<App />);
+// Fix for React createRoot warning during development HMR
+const rootElement = document.getElementById("root")!;
+
+// Check if we already have a root instance attached to avoid multiple createRoot calls
+if (!(rootElement as any)._reactRoot) {
+  const root = createRoot(rootElement);
+  (rootElement as any)._reactRoot = root;
+  root.render(<App />);
+} else {
+  // If root already exists, just re-render
+  (rootElement as any)._reactRoot.render(<App />);
+}
