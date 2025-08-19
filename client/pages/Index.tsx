@@ -423,19 +423,40 @@ export default function Index() {
           return false;
         }
 
-        // Check if there are any embeds to render to prevent errors
+        // Ensure DOM protection is active before checking for embeds
+        if (!domProtectionActive) {
+          createDOMProtection();
+        }
+
+        // Check if there are any embeds to render with enhanced validation
         const embedContainers = document.querySelectorAll('.tiktok-embed-container');
-        if (embedContainers.length === 0) {
+
+        // Verify the result is properly structured
+        if (!embedContainers ||
+            typeof embedContainers.length !== 'number' ||
+            embedContainers.length === 0) {
           return false;
         }
 
         // Additional safety check: verify that embed containers have valid content
-        const validEmbeds = Array.from(embedContainers).filter(container => {
-          const embedElement = container.querySelector('.tiktok-embed');
-          return embedElement && embedElement.hasAttribute('data-video-id');
-        });
+        let validEmbedCount = 0;
+        for (let i = 0; i < embedContainers.length; i++) {
+          try {
+            const container = embedContainers[i];
+            if (container && typeof container.querySelector === 'function') {
+              const embedElement = container.querySelector('.tiktok-embed');
+              if (embedElement &&
+                  typeof embedElement.hasAttribute === 'function' &&
+                  embedElement.hasAttribute('data-video-id')) {
+                validEmbedCount++;
+              }
+            }
+          } catch (e) {
+            console.warn('Error validating embed container:', e);
+          }
+        }
 
-        if (validEmbeds.length === 0) {
+        if (validEmbedCount === 0) {
           return false;
         }
 
