@@ -267,8 +267,10 @@ export default function Index() {
 
     // Create comprehensive DOM protection that handles all possible undefined access patterns
     const createDOMProtection = () => {
-      if (domProtectionActive) return () => {}; // Already protected
-      domProtectionActive = true;
+      if (domProtectionStateRef.current.isActive) {
+        return domProtectionStateRef.current.restoreFunction || (() => {});
+      }
+      domProtectionStateRef.current.isActive = true;
 
       // Store all original methods
       const original = {
