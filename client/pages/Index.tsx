@@ -331,11 +331,14 @@ export default function Index() {
 
         script.onload = () => {
           clearTimeout(timeoutId);
+          // Don't restore DOM protection immediately, keep it for render phase
+          setTimeout(restoreDOM, 5000); // Restore after 5 seconds
           resolve();
         };
 
         script.onerror = () => {
           clearTimeout(timeoutId);
+          restoreDOM(); // Restore on error
           console.warn("TikTok embed script failed to load - continuing without embeds");
           reject(new Error("Failed to load TikTok script"));
         };
