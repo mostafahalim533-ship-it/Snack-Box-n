@@ -27,12 +27,14 @@ export default function TikTokEmbed({ embedCode }: TikTokEmbedProps) {
 
         // Check if the container has content to render
         if (!containerRef.current || !containerRef.current.querySelector('.tiktok-embed')) {
+          console.log('TikTokEmbed: Container or embed element not found');
           return false;
         }
 
         // Additional validation for data-video-id
         const embedElement = containerRef.current.querySelector('.tiktok-embed');
         if (!embedElement || !embedElement.hasAttribute('data-video-id')) {
+          console.log('TikTokEmbed: Embed element missing or no video ID');
           return false;
         }
 
