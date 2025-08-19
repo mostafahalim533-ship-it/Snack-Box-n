@@ -326,8 +326,47 @@ export default function Index() {
           return false;
         }
 
+        // Additional safety check: verify that embed containers have valid content
+        const validEmbeds = Array.from(embedContainers).filter(container => {
+          const embedElement = container.querySelector('.tiktok-embed');
+          return embedElement && embedElement.hasAttribute('data-video-id');
+        });
+
+        if (validEmbeds.length === 0) {
+          return false;
+        }
+
+        // Add defensive wrapper to prevent undefined length errors
+        const originalQuerySelectorAll = document.querySelectorAll;
+        document.querySelectorAll = function(selector) {
+          try {
+            const result = originalQuerySelectorAll.call(document, selector);
+            return result || [];
+          } catch (e) {
+            return [];
+          }
+        };
+
+        // Add similar protection for getElementsByClassName
+        const originalGetElementsByClassName = document.getElementsByClassName;
+        document.getElementsByClassName = function(className) {
+          try {
+            const result = originalGetElementsByClassName.call(document, className);
+            return result || [];
+          } catch (e) {
+            return [];
+          }
+        };
+
         // Attempt to render with try-catch to prevent uncaught errors
         tiktokEmbed.lib.render();
+
+        // Restore original methods after a brief delay
+        setTimeout(() => {
+          document.querySelectorAll = originalQuerySelectorAll;
+          document.getElementsByClassName = originalGetElementsByClassName;
+        }, 100);
+
         return true;
 
       } catch (error) {
@@ -411,9 +450,47 @@ export default function Index() {
                   return;
                 }
 
+                // Additional validation: ensure containers have valid TikTok embed content
+                const validContainers = Array.from(embedContainers).filter(container => {
+                  const embedElement = container.querySelector('.tiktok-embed');
+                  return embedElement && embedElement.hasAttribute('data-video-id');
+                });
+
+                if (validContainers.length === 0) {
+                  return;
+                }
+
+                // Apply the same defensive DOM method wrapping as in the main function
+                const originalQuerySelectorAll = document.querySelectorAll;
+                const originalGetElementsByClassName = document.getElementsByClassName;
+
+                document.querySelectorAll = function(selector) {
+                  try {
+                    const result = originalQuerySelectorAll.call(document, selector);
+                    return result || [];
+                  } catch (e) {
+                    return [];
+                  }
+                };
+
+                document.getElementsByClassName = function(className) {
+                  try {
+                    const result = originalGetElementsByClassName.call(document, className);
+                    return result || [];
+                  } catch (e) {
+                    return [];
+                  }
+                };
+
                 // Safe render attempt
                 windowObj.tiktokEmbed.lib.render();
                 console.log("TikTok embeds reinitialized on scroll");
+
+                // Restore original methods
+                setTimeout(() => {
+                  document.querySelectorAll = originalQuerySelectorAll;
+                  document.getElementsByClassName = originalGetElementsByClassName;
+                }, 100);
 
               } catch (error) {
                 console.warn("TikTok reinitialize failed safely:", error?.message || error);
