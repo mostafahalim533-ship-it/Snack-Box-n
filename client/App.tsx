@@ -36,31 +36,37 @@ const setupGlobalErrorHandler = () => {
   });
 };
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/snack-box-35-count" element={<ProductPage />} />
-          <Route
-            path="/chip-variety-snack-box-42-count"
-            element={<ProductPage />}
-          />
-          <Route path="/variety-snack-box-52-count" element={<ProductPage />} />
-          <Route
-            path="/ultimate-snack-box-105-count"
-            element={<ProductPage />}
-          />
-          <Route path="/:slug" element={<ProductPage />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  useEffect(() => {
+    setupGlobalErrorHandler();
+  }, []);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/snack-box-35-count" element={<ProductPage />} />
+            <Route
+              path="/chip-variety-snack-box-42-count"
+              element={<ProductPage />}
+            />
+            <Route path="/variety-snack-box-52-count" element={<ProductPage />} />
+            <Route
+              path="/ultimate-snack-box-105-count"
+              element={<ProductPage />}
+            />
+            <Route path="/:slug" element={<ProductPage />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 createRoot(document.getElementById("root")!).render(<App />);
