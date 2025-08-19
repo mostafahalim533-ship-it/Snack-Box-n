@@ -437,6 +437,7 @@ export default function Index() {
 
         // Check if TikTok embed object exists with all required properties
         if (!windowObj.tiktokEmbed) {
+          console.log('TikTok embed object not found');
           return false;
         }
 
@@ -444,11 +445,20 @@ export default function Index() {
 
         // Verify lib object exists
         if (!tiktokEmbed.lib || typeof tiktokEmbed.lib !== 'object') {
+          console.log('TikTok embed library not ready');
           return false;
         }
 
         // Verify render function exists and is callable
         if (typeof tiktokEmbed.lib.render !== 'function') {
+          console.log('TikTok embed render function not available');
+          return false;
+        }
+
+        // Additional readiness check: verify the embed script is fully initialized
+        if (tiktokEmbed.lib._initialized === false ||
+            (tiktokEmbed.lib.hasOwnProperty('_ready') && !tiktokEmbed.lib._ready)) {
+          console.log('TikTok embed library not fully initialized');
           return false;
         }
 
