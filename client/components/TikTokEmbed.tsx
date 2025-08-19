@@ -35,38 +35,32 @@ export default function TikTokEmbed({ embedCode }: TikTokEmbedProps) {
           return false;
         }
 
-        // Add defensive DOM method wrapping to prevent undefined length errors
-        const originalQuerySelectorAll = document.querySelectorAll;
-        const originalGetElementsByClassName = document.getElementsByClassName;
-
-        document.querySelectorAll = function(selector) {
+        // Enhanced protection: wrap the render call with comprehensive error handling
+        const renderWithProtection = () => {
           try {
-            const result = originalQuerySelectorAll.call(document, selector);
-            return result || [];
-          } catch (e) {
-            return [];
+            // Double-check that the library is still available
+            if (!windowObj.tiktokEmbed?.lib?.render) {
+              return false;
+            }
+
+            // Call the render function with additional safety
+            windowObj.tiktokEmbed.lib.render();
+            return true;
+          } catch (renderError) {
+            console.warn('TikTok embed render call failed:', renderError);
+            return false;
           }
         };
 
-        document.getElementsByClassName = function(className) {
-          try {
-            const result = originalGetElementsByClassName.call(document, className);
-            return result || [];
-          } catch (e) {
-            return [];
-          }
-        };
+        const renderSuccess = renderWithProtection();
 
-        // Attempt safe render
-        windowObj.tiktokEmbed.lib.render();
-        setIsLoaded(true);
-        setHasError(false);
-
-        // Restore original methods after rendering
-        setTimeout(() => {
-          document.querySelectorAll = originalQuerySelectorAll;
-          document.getElementsByClassName = originalGetElementsByClassName;
-        }, 100);
+        if (renderSuccess) {
+          setIsLoaded(true);
+          setHasError(false);
+          console.log('TikTok embed rendered successfully');
+        } else {
+          setHasError(true);
+        }
 
         return true;
 
