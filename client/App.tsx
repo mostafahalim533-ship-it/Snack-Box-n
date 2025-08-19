@@ -9,8 +9,32 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import ProductPage from "./pages/ProductPage";
 import NotFound from "./pages/NotFound";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
+
+// Global error handler for TikTok embed errors
+const setupGlobalErrorHandler = () => {
+  // Handle uncaught promise rejections (common with TikTok embed script)
+  window.addEventListener('unhandledrejection', (event) => {
+    if (event.reason &&
+        (event.reason.message?.includes('length') ||
+         event.reason.stack?.includes('embed_lib'))) {
+      console.warn('TikTok embed error caught globally:', event.reason);
+      event.preventDefault(); // Prevent error from being logged to console
+    }
+  });
+
+  // Handle regular errors
+  window.addEventListener('error', (event) => {
+    if (event.filename?.includes('embed_lib') ||
+        event.error?.stack?.includes('embed_lib') ||
+        (event.error?.message?.includes('length') && event.filename?.includes('tiktok'))) {
+      console.warn('TikTok embed script error caught globally:', event.error);
+      event.preventDefault(); // Prevent error from being logged to console
+    }
+  });
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
