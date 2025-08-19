@@ -619,7 +619,7 @@ export default function Index() {
                 }
 
                 // Ensure DOM protection is active for reinitialization
-                if (!domProtectionActive) {
+                if (!domProtectionStateRef.current.isActive) {
                   createDOMProtection();
                 }
 
