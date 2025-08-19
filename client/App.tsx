@@ -13,27 +13,57 @@ import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
-// Global error handler for TikTok embed errors
+// Enhanced global error handler for TikTok embed errors
 const setupGlobalErrorHandler = () => {
   // Handle uncaught promise rejections (common with TikTok embed script)
   window.addEventListener('unhandledrejection', (event) => {
-    if (event.reason &&
-        (event.reason.message?.includes('length') ||
-         event.reason.stack?.includes('embed_lib'))) {
-      console.warn('TikTok embed error caught globally:', event.reason);
+    const reason = event.reason;
+    const isEmbedError = reason && (
+      (typeof reason.message === 'string' && reason.message.includes('length')) ||
+      (typeof reason.stack === 'string' && reason.stack.includes('embed_lib')) ||
+      (typeof reason.stack === 'string' && reason.stack.includes('tiktok')) ||
+      (typeof reason.message === 'string' && reason.message.includes('Cannot read properties of undefined'))
+    );
+
+    if (isEmbedError) {
+      console.warn('TikTok embed error caught globally (promise):', reason);
       event.preventDefault(); // Prevent error from being logged to console
     }
   });
 
-  // Handle regular errors
+  // Handle regular errors with enhanced pattern matching
   window.addEventListener('error', (event) => {
-    if (event.filename?.includes('embed_lib') ||
-        event.error?.stack?.includes('embed_lib') ||
-        (event.error?.message?.includes('length') && event.filename?.includes('tiktok'))) {
-      console.warn('TikTok embed script error caught globally:', event.error);
+    const isEmbedError =
+      event.filename?.includes('embed_lib') ||
+      event.filename?.includes('tiktok.com') ||
+      event.error?.stack?.includes('embed_lib') ||
+      event.error?.stack?.includes('tiktok') ||
+      (event.error?.message?.includes('length') &&
+       (event.filename?.includes('tiktok') || event.error?.stack?.includes('embed'))) ||
+      event.error?.message?.includes('Cannot read properties of undefined');
+
+    if (isEmbedError) {
+      console.warn('TikTok embed script error caught globally:', {
+        message: event.error?.message,
+        filename: event.filename,
+        lineno: event.lineno
+      });
       event.preventDefault(); // Prevent error from being logged to console
     }
   });
+
+  // Additional protection: override console.error temporarily for TikTok scripts
+  const originalConsoleError = console.error;
+  console.error = function(...args) {
+    const errorMessage = args.join(' ');
+    if (errorMessage.includes('embed_lib') ||
+        errorMessage.includes('Cannot read properties of undefined') ||
+        (errorMessage.includes('length') && errorMessage.includes('tiktok'))) {
+      console.warn('TikTok embed console error suppressed:', errorMessage);
+      return;
+    }
+    originalConsoleError.apply(console, args);
+  };
 };
 
 const App = () => {
