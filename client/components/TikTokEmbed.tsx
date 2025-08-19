@@ -21,6 +21,7 @@ export default function TikTokEmbed({ embedCode }: TikTokEmbedProps) {
         if (!windowObj.tiktokEmbed ||
             !windowObj.tiktokEmbed.lib ||
             typeof windowObj.tiktokEmbed.lib.render !== 'function') {
+          console.log('TikTokEmbed: Library not ready');
           return false;
         }
 
