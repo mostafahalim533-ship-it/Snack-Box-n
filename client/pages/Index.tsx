@@ -611,37 +611,19 @@ export default function Index() {
                   return;
                 }
 
-                // Apply the same defensive DOM method wrapping as in the main function
-                const originalQuerySelectorAll = document.querySelectorAll;
-                const originalGetElementsByClassName = document.getElementsByClassName;
+                // Ensure DOM protection is active for reinitialization
+                if (!domProtectionActive) {
+                  createDOMProtection();
+                }
 
-                document.querySelectorAll = function(selector) {
-                  try {
-                    const result = originalQuerySelectorAll.call(document, selector);
-                    return result || [];
-                  } catch (e) {
-                    return [];
-                  }
-                };
+                // Use the same safe render function for consistency
+                const reinitSuccess = safeRenderTikTok();
 
-                document.getElementsByClassName = function(className) {
-                  try {
-                    const result = originalGetElementsByClassName.call(document, className);
-                    return result || [];
-                  } catch (e) {
-                    return [];
-                  }
-                };
-
-                // Safe render attempt
-                windowObj.tiktokEmbed.lib.render();
-                console.log("TikTok embeds reinitialized on scroll");
-
-                // Restore original methods
-                setTimeout(() => {
-                  document.querySelectorAll = originalQuerySelectorAll;
-                  document.getElementsByClassName = originalGetElementsByClassName;
-                }, 100);
+                if (reinitSuccess) {
+                  console.log("TikTok embeds reinitialized on scroll");
+                } else {
+                  console.warn("TikTok embeds failed to reinitialize on scroll");
+                }
 
               } catch (error) {
                 console.warn("TikTok reinitialize failed safely:", error?.message || error);
