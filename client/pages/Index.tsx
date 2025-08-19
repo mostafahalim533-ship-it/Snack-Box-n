@@ -411,6 +411,8 @@ export default function Index() {
 
         script.onload = () => {
           clearTimeout(timeoutId);
+          // Mark the load time for readiness checks
+          script.dataset.loadedAt = Date.now().toString();
           // Keep DOM protection active for longer to handle all TikTok initialization
           setTimeout(() => {
             console.log('TikTok script loaded, keeping DOM protection active');
