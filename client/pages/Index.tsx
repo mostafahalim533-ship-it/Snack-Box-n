@@ -617,16 +617,30 @@ export default function Index() {
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            // Wait a bit, then try to reinitialize with comprehensive error handling
+            // Wait longer for TikTok script to be fully ready, then try to reinitialize
             const reinitializeTimer = setTimeout(() => {
               try {
                 const windowObj = window as any;
 
-                // Comprehensive safety checks
+                // Enhanced readiness checks
                 if (!windowObj.tiktokEmbed ||
                     !windowObj.tiktokEmbed.lib ||
                     typeof windowObj.tiktokEmbed.lib.render !== 'function') {
                   console.log("TikTok embed not ready for reinitialization");
+                  return;
+                }
+
+                // Additional check: ensure embed script has been running for sufficient time
+                const tiktokScript = document.querySelector('script[src*="tiktok.com/embed.js"]');
+                if (!tiktokScript || !tiktokScript.dataset.loadedAt) {
+                  console.log("TikTok embed script not fully loaded");
+                  return;
+                }
+
+                const loadedAt = parseInt(tiktokScript.dataset.loadedAt);
+                const timeSinceLoad = Date.now() - loadedAt;
+                if (timeSinceLoad < 3000) { // Ensure at least 3 seconds have passed
+                  console.log("TikTok embed script needs more time to initialize");
                   return;
                 }
 
