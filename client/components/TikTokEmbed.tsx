@@ -29,10 +29,45 @@ export default function TikTokEmbed({ embedCode }: TikTokEmbedProps) {
           return false;
         }
 
+        // Additional validation for data-video-id
+        const embedElement = containerRef.current.querySelector('.tiktok-embed');
+        if (!embedElement || !embedElement.hasAttribute('data-video-id')) {
+          return false;
+        }
+
+        // Add defensive DOM method wrapping to prevent undefined length errors
+        const originalQuerySelectorAll = document.querySelectorAll;
+        const originalGetElementsByClassName = document.getElementsByClassName;
+
+        document.querySelectorAll = function(selector) {
+          try {
+            const result = originalQuerySelectorAll.call(document, selector);
+            return result || [];
+          } catch (e) {
+            return [];
+          }
+        };
+
+        document.getElementsByClassName = function(className) {
+          try {
+            const result = originalGetElementsByClassName.call(document, className);
+            return result || [];
+          } catch (e) {
+            return [];
+          }
+        };
+
         // Attempt safe render
         windowObj.tiktokEmbed.lib.render();
         setIsLoaded(true);
         setHasError(false);
+
+        // Restore original methods after rendering
+        setTimeout(() => {
+          document.querySelectorAll = originalQuerySelectorAll;
+          document.getElementsByClassName = originalGetElementsByClassName;
+        }, 100);
+
         return true;
 
       } catch (error) {
