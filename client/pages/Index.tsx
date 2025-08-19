@@ -350,31 +350,8 @@ export default function Index() {
         }
       };
 
-      // Additional protection for common array/collection operations that TikTok embed might use
-      const protectArrayAccess = (obj: any, methodName: string) => {
-        if (obj && obj[methodName]) {
-          const originalMethod = obj[methodName];
-          obj[methodName] = function(...args: any[]) {
-            try {
-              const result = originalMethod.apply(this, args);
-              // Ensure result has proper length property
-              if (result && typeof result === 'object' && !('length' in result)) {
-                Object.defineProperty(result, 'length', { value: 0, writable: true });
-              }
-              return result || [];
-            } catch (e) {
-              console.warn(`Protected ${methodName} caught error:`, e);
-              return [];
-            }
-          };
-        }
-      };
-
-      // Protect common HTML collection methods
-      protectArrayAccess(document, 'forms');
-      protectArrayAccess(document, 'links');
-      protectArrayAccess(document, 'images');
-      protectArrayAccess(document, 'scripts');
+      // Note: Removed problematic protectArrayAccess calls for read-only document properties
+      // document.forms, document.links, document.images, document.scripts are read-only getters
 
       // Add protection to Element.prototype methods if they exist
       if (typeof Element !== 'undefined' && Element.prototype) {
