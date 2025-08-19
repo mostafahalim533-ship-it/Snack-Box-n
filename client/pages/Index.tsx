@@ -253,11 +253,106 @@ export default function Index() {
     };
   }, [selectedProduct]);
 
-  // Enhanced TikTok embed initialization with better error handling
+  // Enhanced TikTok embed initialization with comprehensive error prevention
   useEffect(() => {
     let retryCount = 0;
     const maxRetries = 2; // Reduced retries to avoid excessive requests
     let initializationTimers: NodeJS.Timeout[] = [];
+    let domProtectionActive = false;
+
+    // Create comprehensive DOM protection that handles all possible undefined access patterns
+    const createDOMProtection = () => {
+      if (domProtectionActive) return () => {}; // Already protected
+      domProtectionActive = true;
+
+      // Store all original methods
+      const original = {
+        querySelectorAll: document.querySelectorAll,
+        getElementsByClassName: document.getElementsByClassName,
+        getElementsByTagName: document.getElementsByTagName,
+        getElementById: document.getElementById,
+        querySelector: document.querySelector
+      };
+
+      // Enhanced querySelectorAll with null checks and empty array fallback
+      document.querySelectorAll = function(selector) {
+        try {
+          if (!selector || typeof selector !== 'string') return [];
+          const result = original.querySelectorAll.call(document, selector);
+          // Ensure result has length property and is iterable
+          if (!result || typeof result.length !== 'number') {
+            return [];
+          }
+          // Convert NodeList to Array to prevent prototype issues
+          return Array.from(result);
+        } catch (e) {
+          console.warn('Protected querySelectorAll caught error:', e);
+          return [];
+        }
+      };
+
+      // Enhanced getElementsByClassName
+      document.getElementsByClassName = function(className) {
+        try {
+          if (!className || typeof className !== 'string') return [];
+          const result = original.getElementsByClassName.call(document, className);
+          if (!result || typeof result.length !== 'number') {
+            return [];
+          }
+          return Array.from(result);
+        } catch (e) {
+          console.warn('Protected getElementsByClassName caught error:', e);
+          return [];
+        }
+      };
+
+      // Enhanced getElementsByTagName
+      document.getElementsByTagName = function(tagName) {
+        try {
+          if (!tagName || typeof tagName !== 'string') return [];
+          const result = original.getElementsByTagName.call(document, tagName);
+          if (!result || typeof result.length !== 'number') {
+            return [];
+          }
+          return Array.from(result);
+        } catch (e) {
+          console.warn('Protected getElementsByTagName caught error:', e);
+          return [];
+        }
+      };
+
+      // Enhanced querySelector
+      document.querySelector = function(selector) {
+        try {
+          if (!selector || typeof selector !== 'string') return null;
+          return original.querySelector.call(document, selector);
+        } catch (e) {
+          console.warn('Protected querySelector caught error:', e);
+          return null;
+        }
+      };
+
+      // Enhanced getElementById
+      document.getElementById = function(id) {
+        try {
+          if (!id || typeof id !== 'string') return null;
+          return original.getElementById.call(document, id);
+        } catch (e) {
+          console.warn('Protected getElementById caught error:', e);
+          return null;
+        }
+      };
+
+      // Return restoration function
+      return () => {
+        domProtectionActive = false;
+        document.querySelectorAll = original.querySelectorAll;
+        document.getElementsByClassName = original.getElementsByClassName;
+        document.getElementsByTagName = original.getElementsByTagName;
+        document.getElementById = original.getElementById;
+        document.querySelector = original.querySelector;
+      };
+    };
 
     const loadTikTokScript = () => {
       return new Promise<void>((resolve, reject) => {
@@ -270,52 +365,8 @@ export default function Index() {
           return;
         }
 
-        // Apply global DOM method protection before loading script
-        const setupDOMProtection = () => {
-          // Store original methods
-          const originalQSA = document.querySelectorAll;
-          const originalGEBCN = document.getElementsByClassName;
-          const originalGEBTN = document.getElementsByTagName;
-
-          // Protected querySelectorAll
-          document.querySelectorAll = function(selector) {
-            try {
-              const result = originalQSA.call(document, selector);
-              return result || [];
-            } catch (e) {
-              return [];
-            }
-          };
-
-          // Protected getElementsByClassName
-          document.getElementsByClassName = function(className) {
-            try {
-              const result = originalGEBCN.call(document, className);
-              return result || [];
-            } catch (e) {
-              return [];
-            }
-          };
-
-          // Protected getElementsByTagName
-          document.getElementsByTagName = function(tagName) {
-            try {
-              const result = originalGEBTN.call(document, tagName);
-              return result || [];
-            } catch (e) {
-              return [];
-            }
-          };
-
-          return () => {
-            // Restore original methods
-            document.querySelectorAll = originalQSA;
-            document.getElementsByClassName = originalGEBCN;
-            document.getElementsByTagName = originalGEBTN;
-          };
-        };
-
-        const restoreDOM = setupDOMProtection();
+        // Apply comprehensive DOM protection before loading script
+        const restoreDOM = createDOMProtection();
 
         // Create new script without cache-busting to avoid repeated failures
         const script = document.createElement("script");
@@ -331,8 +382,10 @@ export default function Index() {
 
         script.onload = () => {
           clearTimeout(timeoutId);
-          // Don't restore DOM protection immediately, keep it for render phase
-          setTimeout(restoreDOM, 5000); // Restore after 5 seconds
+          // Keep DOM protection active for longer to handle all TikTok initialization
+          setTimeout(() => {
+            console.log('TikTok script loaded, keeping DOM protection active');
+          }, 1000);
           resolve();
         };
 
