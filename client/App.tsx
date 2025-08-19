@@ -64,6 +64,34 @@ const setupGlobalErrorHandler = () => {
     }
     originalConsoleError.apply(console, args);
   };
+
+  // Add global protection for Array.from operations that TikTok embed might use
+  const originalArrayFrom = Array.from;
+  Array.from = function(arrayLike, mapFn?, thisArg?) {
+    try {
+      if (!arrayLike) return [];
+      // Ensure arrayLike has a length property
+      if (typeof arrayLike === 'object' && !('length' in arrayLike)) {
+        return [];
+      }
+      return originalArrayFrom.call(Array, arrayLike, mapFn, thisArg);
+    } catch (e) {
+      console.warn('Protected Array.from caught error:', e);
+      return [];
+    }
+  };
+
+  // Add protection for Object.keys which might be used on undefined objects
+  const originalObjectKeys = Object.keys;
+  Object.keys = function(obj) {
+    try {
+      if (!obj || typeof obj !== 'object') return [];
+      return originalObjectKeys.call(Object, obj);
+    } catch (e) {
+      console.warn('Protected Object.keys caught error:', e);
+      return [];
+    }
+  };
 };
 
 const App = () => {
