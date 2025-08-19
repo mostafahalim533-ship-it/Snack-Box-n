@@ -680,7 +680,7 @@ export default function Index() {
                 console.warn("TikTok reinitialize failed safely:", error?.message || error);
                 // Continue gracefully without throwing
               }
-            }, 500);
+            }, 2000); // Increased delay to ensure TikTok script is fully ready
 
             // Store timer reference for cleanup
             entry.target.setAttribute('data-reinit-timer', reinitializeTimer.toString());
