@@ -555,6 +555,19 @@ export default function Index() {
       // Clear all timers to prevent memory leaks
       initializationTimers.forEach(timer => clearTimeout(timer));
 
+      // Restore DOM methods if protection is still active
+      if (domProtectionActive) {
+        try {
+          // Only restore if we have the function reference
+          const restoreFunction = createDOMProtection();
+          if (typeof restoreFunction === 'function') {
+            restoreFunction();
+          }
+        } catch (e) {
+          console.warn('Error restoring DOM methods on cleanup:', e);
+        }
+      }
+
       // Don't remove script on unmount to avoid repeated loading attempts
       // The script will persist for the session
     };
