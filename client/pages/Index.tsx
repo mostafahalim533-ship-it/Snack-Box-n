@@ -253,12 +253,17 @@ export default function Index() {
     };
   }, [selectedProduct]);
 
+  // Shared state for DOM protection across all TikTok initialization functions
+  const domProtectionStateRef = useRef({
+    isActive: false,
+    restoreFunction: null as (() => void) | null
+  });
+
   // Enhanced TikTok embed initialization with comprehensive error prevention
   useEffect(() => {
     let retryCount = 0;
     const maxRetries = 2; // Reduced retries to avoid excessive requests
     let initializationTimers: NodeJS.Timeout[] = [];
-    let domProtectionActive = false;
 
     // Create comprehensive DOM protection that handles all possible undefined access patterns
     const createDOMProtection = () => {
