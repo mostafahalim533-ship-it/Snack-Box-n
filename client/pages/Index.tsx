@@ -253,11 +253,138 @@ export default function Index() {
     };
   }, [selectedProduct]);
 
-  // Enhanced TikTok embed initialization with better error handling
+  // Shared state for DOM protection across all TikTok initialization functions
+  const domProtectionStateRef = useRef({
+    isActive: false,
+    restoreFunction: null as (() => void) | null,
+  });
+
+  // Enhanced TikTok embed initialization with comprehensive error prevention
   useEffect(() => {
     let retryCount = 0;
     const maxRetries = 2; // Reduced retries to avoid excessive requests
     let initializationTimers: NodeJS.Timeout[] = [];
+
+    // Create comprehensive DOM protection that handles all possible undefined access patterns
+    const createDOMProtection = () => {
+      if (domProtectionStateRef.current.isActive) {
+        return domProtectionStateRef.current.restoreFunction || (() => {});
+      }
+      domProtectionStateRef.current.isActive = true;
+
+      // Store all original methods
+      const original = {
+        querySelectorAll: document.querySelectorAll,
+        getElementsByClassName: document.getElementsByClassName,
+        getElementsByTagName: document.getElementsByTagName,
+        getElementById: document.getElementById,
+        querySelector: document.querySelector,
+      };
+
+      // Enhanced querySelectorAll with null checks and empty array fallback
+      document.querySelectorAll = function (selector) {
+        try {
+          if (!selector || typeof selector !== "string") return [];
+          const result = original.querySelectorAll.call(document, selector);
+          // Ensure result has length property and is iterable
+          if (!result || typeof result.length !== "number") {
+            return [];
+          }
+          // Convert NodeList to Array to prevent prototype issues
+          return Array.from(result);
+        } catch (e) {
+          console.warn("Protected querySelectorAll caught error:", e);
+          return [];
+        }
+      };
+
+      // Enhanced getElementsByClassName
+      document.getElementsByClassName = function (className) {
+        try {
+          if (!className || typeof className !== "string") return [];
+          const result = original.getElementsByClassName.call(
+            document,
+            className,
+          );
+          if (!result || typeof result.length !== "number") {
+            return [];
+          }
+          return Array.from(result);
+        } catch (e) {
+          console.warn("Protected getElementsByClassName caught error:", e);
+          return [];
+        }
+      };
+
+      // Enhanced getElementsByTagName
+      document.getElementsByTagName = function (tagName) {
+        try {
+          if (!tagName || typeof tagName !== "string") return [];
+          const result = original.getElementsByTagName.call(document, tagName);
+          if (!result || typeof result.length !== "number") {
+            return [];
+          }
+          return Array.from(result);
+        } catch (e) {
+          console.warn("Protected getElementsByTagName caught error:", e);
+          return [];
+        }
+      };
+
+      // Enhanced querySelector
+      document.querySelector = function (selector) {
+        try {
+          if (!selector || typeof selector !== "string") return null;
+          return original.querySelector.call(document, selector);
+        } catch (e) {
+          console.warn("Protected querySelector caught error:", e);
+          return null;
+        }
+      };
+
+      // Enhanced getElementById
+      document.getElementById = function (id) {
+        try {
+          if (!id || typeof id !== "string") return null;
+          return original.getElementById.call(document, id);
+        } catch (e) {
+          console.warn("Protected getElementById caught error:", e);
+          return null;
+        }
+      };
+
+      // Note: Removed problematic protectArrayAccess calls for read-only document properties
+      // document.forms, document.links, document.images, document.scripts are read-only getters
+
+      // Add protection to Element.prototype methods if they exist
+      if (typeof Element !== "undefined" && Element.prototype) {
+        const originalMatches = Element.prototype.matches;
+        if (originalMatches) {
+          Element.prototype.matches = function (selector) {
+            try {
+              return originalMatches.call(this, selector);
+            } catch (e) {
+              console.warn("Protected Element.matches caught error:", e);
+              return false;
+            }
+          };
+        }
+      }
+
+      // Return restoration function
+      const restoreFunction = () => {
+        domProtectionStateRef.current.isActive = false;
+        domProtectionStateRef.current.restoreFunction = null;
+        document.querySelectorAll = original.querySelectorAll;
+        document.getElementsByClassName = original.getElementsByClassName;
+        document.getElementsByTagName = original.getElementsByTagName;
+        document.getElementById = original.getElementById;
+        document.querySelector = original.querySelector;
+      };
+
+      domProtectionStateRef.current.restoreFunction = restoreFunction;
+      return restoreFunction;
+    };
 
     const loadTikTokScript = () => {
       return new Promise<void>((resolve, reject) => {
@@ -269,6 +396,9 @@ export default function Index() {
           resolve();
           return;
         }
+
+        // Apply comprehensive DOM protection before loading script
+        const restoreDOM = createDOMProtection();
 
         // Create new script without cache-busting to avoid repeated failures
         const script = document.createElement("script");
@@ -284,12 +414,21 @@ export default function Index() {
 
         script.onload = () => {
           clearTimeout(timeoutId);
+          // Mark the load time for readiness checks
+          script.dataset.loadedAt = Date.now().toString();
+          // Keep DOM protection active for longer to handle all TikTok initialization
+          setTimeout(() => {
+            console.log("TikTok script loaded, keeping DOM protection active");
+          }, 1000);
           resolve();
         };
 
         script.onerror = () => {
           clearTimeout(timeoutId);
-          console.warn("TikTok embed script failed to load - continuing without embeds");
+          restoreDOM(); // Restore on error
+          console.warn(
+            "TikTok embed script failed to load - continuing without embeds",
+          );
           reject(new Error("Failed to load TikTok script"));
         };
 
@@ -305,31 +444,125 @@ export default function Index() {
 
         // Check if TikTok embed object exists with all required properties
         if (!windowObj.tiktokEmbed) {
+          console.log("TikTok embed object not found");
           return false;
         }
 
         const { tiktokEmbed } = windowObj;
 
         // Verify lib object exists
-        if (!tiktokEmbed.lib || typeof tiktokEmbed.lib !== 'object') {
+        if (!tiktokEmbed.lib || typeof tiktokEmbed.lib !== "object") {
+          console.log("TikTok embed library not ready");
           return false;
         }
 
         // Verify render function exists and is callable
-        if (typeof tiktokEmbed.lib.render !== 'function') {
+        if (typeof tiktokEmbed.lib.render !== "function") {
+          console.log("TikTok embed render function not available");
           return false;
         }
 
-        // Check if there are any embeds to render to prevent errors
-        const embedContainers = document.querySelectorAll('.tiktok-embed-container');
-        if (embedContainers.length === 0) {
+        // Additional readiness check: verify the embed script is fully initialized
+        if (
+          tiktokEmbed.lib._initialized === false ||
+          (tiktokEmbed.lib.hasOwnProperty("_ready") && !tiktokEmbed.lib._ready)
+        ) {
+          console.log("TikTok embed library not fully initialized");
           return false;
         }
 
-        // Attempt to render with try-catch to prevent uncaught errors
-        tiktokEmbed.lib.render();
-        return true;
+        // Ensure DOM protection is active before checking for embeds
+        if (!domProtectionStateRef.current.isActive) {
+          createDOMProtection();
+        }
 
+        // Check if there are any embeds to render with enhanced validation
+        const embedContainers = document.querySelectorAll(
+          ".tiktok-embed-container",
+        );
+
+        // Verify the result is properly structured
+        if (
+          !embedContainers ||
+          typeof embedContainers.length !== "number" ||
+          embedContainers.length === 0
+        ) {
+          return false;
+        }
+
+        // Additional safety check: verify that embed containers have valid content
+        let validEmbedCount = 0;
+        for (let i = 0; i < embedContainers.length; i++) {
+          try {
+            const container = embedContainers[i];
+            if (container && typeof container.querySelector === "function") {
+              const embedElement = container.querySelector(".tiktok-embed");
+              if (
+                embedElement &&
+                typeof embedElement.hasAttribute === "function" &&
+                embedElement.hasAttribute("data-video-id")
+              ) {
+                validEmbedCount++;
+              }
+            }
+          } catch (e) {
+            console.warn("Error validating embed container:", e);
+          }
+        }
+
+        if (validEmbedCount === 0) {
+          return false;
+        }
+
+        // Add defensive wrapper to prevent undefined length errors
+        const originalQuerySelectorAll = document.querySelectorAll;
+        document.querySelectorAll = function (selector) {
+          try {
+            const result = originalQuerySelectorAll.call(document, selector);
+            return result || [];
+          } catch (e) {
+            return [];
+          }
+        };
+
+        // Add similar protection for getElementsByClassName
+        const originalGetElementsByClassName = document.getElementsByClassName;
+        document.getElementsByClassName = function (className) {
+          try {
+            const result = originalGetElementsByClassName.call(
+              document,
+              className,
+            );
+            return result || [];
+          } catch (e) {
+            return [];
+          }
+        };
+
+        // Additional protection: wrap the render call with comprehensive error handling
+        const renderWithProtection = () => {
+          try {
+            // Double-check that the library is still available
+            if (!windowObj.tiktokEmbed?.lib?.render) {
+              return false;
+            }
+
+            // Call the render function with additional safety
+            windowObj.tiktokEmbed.lib.render();
+            return true;
+          } catch (renderError) {
+            console.warn("TikTok render call failed:", renderError);
+            return false;
+          }
+        };
+
+        const renderSuccess = renderWithProtection();
+
+        if (renderSuccess) {
+          console.log("TikTok embeds rendered successfully with protection");
+        }
+
+        return renderSuccess;
       } catch (error) {
         console.warn("TikTok render attempt failed safely:", error);
         return false;
@@ -355,7 +588,9 @@ export default function Index() {
               if (safeRenderTikTok()) {
                 console.log("TikTok embeds rendered on retry");
               } else {
-                console.warn("TikTok embeds failed to initialize - videos may not display");
+                console.warn(
+                  "TikTok embeds failed to initialize - videos may not display",
+                );
               }
             }, 3000);
             initializationTimers.push(timer2);
@@ -363,7 +598,6 @@ export default function Index() {
         }, 2000);
 
         initializationTimers.push(timer1);
-
       } catch (error) {
         console.warn("TikTok embeds unavailable:", error?.message || error);
         // Gracefully continue without TikTok embeds
@@ -376,7 +610,19 @@ export default function Index() {
 
     return () => {
       // Clear all timers to prevent memory leaks
-      initializationTimers.forEach(timer => clearTimeout(timer));
+      initializationTimers.forEach((timer) => clearTimeout(timer));
+
+      // Restore DOM methods if protection is still active
+      if (
+        domProtectionStateRef.current.isActive &&
+        domProtectionStateRef.current.restoreFunction
+      ) {
+        try {
+          domProtectionStateRef.current.restoreFunction();
+        } catch (e) {
+          console.warn("Error restoring DOM methods on cleanup:", e);
+        }
+      }
 
       // Don't remove script on unmount to avoid repeated loading attempts
       // The script will persist for the session
@@ -392,37 +638,92 @@ export default function Index() {
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            // Wait a bit, then try to reinitialize with comprehensive error handling
+            // Wait longer for TikTok script to be fully ready, then try to reinitialize
             const reinitializeTimer = setTimeout(() => {
               try {
                 const windowObj = window as any;
 
-                // Comprehensive safety checks
-                if (!windowObj.tiktokEmbed ||
-                    !windowObj.tiktokEmbed.lib ||
-                    typeof windowObj.tiktokEmbed.lib.render !== 'function') {
+                // Enhanced readiness checks
+                if (
+                  !windowObj.tiktokEmbed ||
+                  !windowObj.tiktokEmbed.lib ||
+                  typeof windowObj.tiktokEmbed.lib.render !== "function"
+                ) {
                   console.log("TikTok embed not ready for reinitialization");
                   return;
                 }
 
+                // Additional check: ensure embed script has been running for sufficient time
+                const tiktokScript = document.querySelector(
+                  'script[src*="tiktok.com/embed.js"]',
+                );
+                if (!tiktokScript || !tiktokScript.dataset.loadedAt) {
+                  console.log("TikTok embed script not fully loaded");
+                  return;
+                }
+
+                const loadedAt = parseInt(tiktokScript.dataset.loadedAt);
+                const timeSinceLoad = Date.now() - loadedAt;
+                if (timeSinceLoad < 3000) {
+                  // Ensure at least 3 seconds have passed
+                  console.log(
+                    "TikTok embed script needs more time to initialize",
+                  );
+                  return;
+                }
+
                 // Check if there are embed containers to render
-                const embedContainers = document.querySelectorAll('.tiktok-embed-container');
+                const embedContainers = document.querySelectorAll(
+                  ".tiktok-embed-container",
+                );
                 if (embedContainers.length === 0) {
                   return;
                 }
 
-                // Safe render attempt
-                windowObj.tiktokEmbed.lib.render();
-                console.log("TikTok embeds reinitialized on scroll");
+                // Additional validation: ensure containers have valid TikTok embed content
+                const validContainers = Array.from(embedContainers).filter(
+                  (container) => {
+                    const embedElement =
+                      container.querySelector(".tiktok-embed");
+                    return (
+                      embedElement && embedElement.hasAttribute("data-video-id")
+                    );
+                  },
+                );
 
+                if (validContainers.length === 0) {
+                  return;
+                }
+
+                // Ensure DOM protection is active for reinitialization
+                if (!domProtectionStateRef.current.isActive) {
+                  createDOMProtection();
+                }
+
+                // Use the same safe render function for consistency
+                const reinitSuccess = safeRenderTikTok();
+
+                if (reinitSuccess) {
+                  console.log("TikTok embeds reinitialized on scroll");
+                } else {
+                  console.warn(
+                    "TikTok embeds failed to reinitialize on scroll",
+                  );
+                }
               } catch (error) {
-                console.warn("TikTok reinitialize failed safely:", error?.message || error);
+                console.warn(
+                  "TikTok reinitialize failed safely:",
+                  error?.message || error,
+                );
                 // Continue gracefully without throwing
               }
-            }, 500);
+            }, 2000); // Increased delay to ensure TikTok script is fully ready
 
             // Store timer reference for cleanup
-            entry.target.setAttribute('data-reinit-timer', reinitializeTimer.toString());
+            entry.target.setAttribute(
+              "data-reinit-timer",
+              reinitializeTimer.toString(),
+            );
           }
         });
       },
@@ -434,7 +735,7 @@ export default function Index() {
     return () => {
       observer.disconnect();
       // Clear any pending reinitialize timers
-      const timerAttr = tiktokSection.getAttribute('data-reinit-timer');
+      const timerAttr = tiktokSection.getAttribute("data-reinit-timer");
       if (timerAttr) {
         clearTimeout(parseInt(timerAttr));
       }
@@ -997,76 +1298,81 @@ export default function Index() {
       {/* Testimonials Section */}
       <TestimonialsCarousel />
       {/* TikTok Videos Section */}
-      <ErrorBoundary fallback={
-        <div className="py-12 text-center bg-gray-100">
-          <p className="text-gray-600">Social media content temporarily unavailable</p>
-        </div>
-      }>
-      <section
-        className="tiktok-section py-6 sm:py-12 px-4 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden"
-        style={{
-          background:
-            "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
-        }}
-      >
-        {/* Decorative elements */}
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-40 -right-40 w-80 h-80 bg-pink-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl"></div>
-          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
-        </div>
-
-        <div className="max-w-5xl mx-auto relative z-10">
-          <div className="text-center mb-6 sm:mb-10 relative z-10">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 sm:mb-3 tracking-tight">
-              Watch Gift A Snack on TikTok
-            </h2>
-            <p className="text-base text-gray-300 max-w-xl mx-auto">
-              See our snack boxes in action and get inspired for your next order
+      <ErrorBoundary
+        fallback={
+          <div className="py-12 text-center bg-gray-100">
+            <p className="text-gray-600">
+              Social media content temporarily unavailable
             </p>
           </div>
-
-          {/* Call to action for videos */}
-          <div className="text-center mb-6 sm:mb-8">
-            <a
-              href="https://tiktok.com/@nut.cravings"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold px-6 py-3 rounded-xl transition-all duration-300 hover:scale-105 shadow-lg"
-            >
-              <Play className="w-4 h-4" />
-              Follow us on TikTok
-              <ExternalLink className="w-4 h-4" />
-            </a>
+        }
+      >
+        <section
+          className="tiktok-section py-6 sm:py-12 px-4 bg-gradient-to-b from-gray-900 via-gray-800 to-gray-900 relative overflow-hidden"
+          style={{
+            background:
+              "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
+          }}
+        >
+          {/* Decorative elements */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className="absolute -top-40 -right-40 w-80 h-80 bg-pink-500/10 rounded-full blur-3xl"></div>
+            <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl"></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl"></div>
           </div>
 
-          <div className="flex flex-col lg:flex-row justify-center items-start gap-8 lg:gap-12 max-w-6xl mx-auto">
-            {/* First TikTok Video */}
-            <div
-              className="tiktok-embed-container mb-8 lg:mb-0"
-              dangerouslySetInnerHTML={{
-                __html: `<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@nut.cravings/video/7522097145223187725" data-video-id="7522097145223187725" style="max-width: 605px;min-width: 325px;"> <section> <a target="_blank" title="@nut.cravings" href="https://www.tiktok.com/@nut.cravings?refer=embed">@nut.cravings</a> Gift A Snack - Assorted Healthy Treats, Granola Bars, Chips, Candies &amp; More | Perfect for Gifting &amp; Care Packages <a title="giftasnack" target="_blank" href="https://www.tiktok.com/tag/giftasnack?refer=embed">#GiftASnack</a> <a title="snackbox" target="_blank" href="https://www.tiktok.com/tag/snackbox?refer=embed">#SnackBox</a> <a title="healthytreats" target="_blank" href="https://www.tiktok.com/tag/healthytreats?refer=embed">#HealthyTreats</a> <a title="carepackage" target="_blank" href="https://www.tiktok.com/tag/carepackage?refer=embed">#CarePackage</a> <a title="giftboxideas" target="_blank" href="https://www.tiktok.com/tag/giftboxideas?refer=embed">#GiftBoxIdeas</a> <a title="snacklovers" target="_blank" href="https://www.tiktok.com/tag/snacklovers?refer=embed">#SnackLovers</a> <a title="granolabars" target="_blank" href="https://www.tiktok.com/tag/granolabars?refer=embed">#GranolaBars</a> <a title="chipsandcandy" target="_blank" href="https://www.tiktok.com/tag/chipsandcandy?refer=embed">#ChipsAndCandy</a> <a title="snacktime" target="_blank" href="https://www.tiktok.com/tag/snacktime?refer=embed">#SnackTime</a> <a title="foodgiftbox" target="_blank" href="https://www.tiktok.com/tag/foodgiftbox?refer=embed">#FoodGiftBox</a> <a title="assortedsnacks" target="_blank" href="https://www.tiktok.com/tag/assortedsnacks?refer=embed">#AssortedSnacks</a> <a title="giftingmadeeasy" target="_blank" href="https://www.tiktok.com/tag/giftingmadeeasy?refer=embed">#GiftingMadeEasy</a> <a title="snacksurprise" target="_blank" href="https://www.tiktok.com/tag/snacksurprise?refer=embed">#SnackSurprise</a> <a title="collegecarepackage" target="_blank" href="https://www.tiktok.com/tag/collegecarepackage?refer=embed">#CollegeCarePackage</a> <a title="corporategifts" target="_blank" href="https://www.tiktok.com/tag/corporategifts?refer=embed">#CorporateGifts</a> <a title="snackaddict" target="_blank" href="https://www.tiktok.com/tag/snackaddict?refer=embed">#SnackAddict</a> <a target="_blank" title="♬ Product introduction, commercials, information, summer(1284254) - yutaka.T" href="https://www.tiktok.com/music/Product-introduction-commercials-information-summer-1284254-7133249539493857281?refer=embed">♬ Product introduction, commercials, information, summer(1284254) - yutaka.T</a> </section> </blockquote>`,
-              }}
-            />
+          <div className="max-w-5xl mx-auto relative z-10">
+            <div className="text-center mb-6 sm:mb-10 relative z-10">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2 sm:mb-3 tracking-tight">
+                Watch Gift A Snack on TikTok
+              </h2>
+              <p className="text-base text-gray-300 max-w-xl mx-auto">
+                See our snack boxes in action and get inspired for your next
+                order
+              </p>
+            </div>
 
-            {/* Second TikTok Video */}
-            <div
-              className="tiktok-embed-container mb-8 lg:mb-0"
-              dangerouslySetInnerHTML={{
-                __html: `<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@nut.cravings/video/7521731881373682958" data-video-id="7521731881373682958" style="max-width: 605px;min-width: 325px;"> <section> <a target="_blank" title="@nut.cravings" href="https://www.tiktok.com/@nut.cravings?refer=embed">@nut.cravings</a> Gift A Snack - Assorted Healthy Treats, Granola Bars, Chips, Candies &amp; More | Perfect for Gifting &amp; Care Packages <a title="giftasnack" target="_blank" href="https://www.tiktok.com/tag/giftasnack?refer=embed">#GiftASnack</a><a title="snackbox" target="_blank" href="https://www.tiktok.com/tag/snackbox?refer=embed">#SnackBox</a><a title="healthysnacking" target="_blank" href="https://www.tiktok.com/tag/healthysnacking?refer=embed">#HealthySnacking</a><a title="carepackage" target="_blank" href="https://www.tiktok.com/tag/carepackage?refer=embed">#CarePackage</a><a title="snacklovers" target="_blank" href="https://www.tiktok.com/tag/snacklovers?refer=embed">#SnackLovers</a><a title="giftideas" target="_blank" href="https://www.tiktok.com/tag/giftideas?refer=embed">#GiftIdeas</a><a title="snacktime" target="_blank" href="https://www.tiktok.com/tag/snacktime?refer=embed">#SnackTime</a><a title="treatyourself" target="_blank" href="https://www.tiktok.com/tag/treatyourself?refer=embed">#TreatYourself</a> <a target="_blank" title="♬ Product introduction, commercials, information, summer(1284254) - yutaka.T" href="https://www.tiktok.com/music/Product-introduction-commercials-information-summer-1284254-7133249539493857281?refer=embed">♬ Product introduction, commercials, information, summer(1284254) - yutaka.T</a> </section> </blockquote>`,
-              }}
-            />
+            {/* Call to action for videos */}
+            <div className="text-center mb-6 sm:mb-8">
+              <a
+                href="https://tiktok.com/@nut.cravings"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold px-6 py-3 rounded-xl transition-all duration-300 hover:scale-105 shadow-lg"
+              >
+                <Play className="w-4 h-4" />
+                Follow us on TikTok
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            </div>
 
-            {/* Third TikTok Video */}
-            <div
-              className="tiktok-embed-container mb-8 lg:mb-0"
-              dangerouslySetInnerHTML={{
-                __html: `<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@nut.cravings/video/7520248009863580983" data-video-id="7520248009863580983" style="max-width: 605px;min-width: 325px;"> <section> <a target="_blank" title="@nut.cravings" href="https://www.tiktok.com/@nut.cravings?refer=embed">@nut.cravings</a> Gift A Snack - Assorted Healthy Treats, Granola Bars, Chips, Candies &amp; More | Perfect for Gifting &amp; Care Packages <a title="giftasnack" target="_blank" href="https://www.tiktok.com/tag/giftasnack?refer=embed">#GiftASnack</a><a title="snackbox" target="_blank" href="https://www.tiktok.com/tag/snackbox?refer=embed">#SnackBox</a><a title="healthysnacks" target="_blank" href="https://www.tiktok.com/tag/healthysnacks?refer=embed">#HealthySnacks</a><a title="carepackage" target="_blank" href="https://www.tiktok.com/tag/carepackage?refer=embed">#CarePackage</a><a title="snackgiftbox" target="_blank" href="https://www.tiktok.com/tag/snackgiftbox?refer=embed">#SnackGiftBox</a><a title="treatyourself" target="_blank" href="https://www.tiktok.com/tag/treatyourself?refer=embed">#TreatYourself</a><a title="snacktime" target="_blank" href="https://www.tiktok.com/tag/snacktime?refer=embed">#SnackTime</a><a title="granolabars" target="_blank" href="https://www.tiktok.com/tag/granolabars?refer=embed">#GranolaBars</a><a title="snacklover" target="_blank" href="https://www.tiktok.com/tag/snacklover?refer=embed">#SnackLover</a><a title="giftingideas" target="_blank" href="https://www.tiktok.com/tag/giftingideas?refer=embed">#GiftingIdeas</a> <a title="tiktokmademebuyit" target="_blank" href="https://www.tiktok.com/tag/tiktokmademebuyit?refer=embed">#TikTokMadeMeBuyIt</a> <a target="_blank" title="♬ Cowboy Sunday - Amanda Rosa" href="https://www.tiktok.com/music/Cowboy-Sunday-7057541372371093505?refer=embed">♬ Cowboy Sunday - Amanda Rosa</a> </section> </blockquote>`,
-              }}
-            />
+            <div className="flex flex-col lg:flex-row justify-center items-start gap-8 lg:gap-12 max-w-6xl mx-auto">
+              {/* First TikTok Video */}
+              <div
+                className="tiktok-embed-container mb-8 lg:mb-0"
+                dangerouslySetInnerHTML={{
+                  __html: `<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@nut.cravings/video/7522097145223187725" data-video-id="7522097145223187725" style="max-width: 605px;min-width: 325px;"> <section> <a target="_blank" title="@nut.cravings" href="https://www.tiktok.com/@nut.cravings?refer=embed">@nut.cravings</a> Gift A Snack - Assorted Healthy Treats, Granola Bars, Chips, Candies &amp; More | Perfect for Gifting &amp; Care Packages <a title="giftasnack" target="_blank" href="https://www.tiktok.com/tag/giftasnack?refer=embed">#GiftASnack</a> <a title="snackbox" target="_blank" href="https://www.tiktok.com/tag/snackbox?refer=embed">#SnackBox</a> <a title="healthytreats" target="_blank" href="https://www.tiktok.com/tag/healthytreats?refer=embed">#HealthyTreats</a> <a title="carepackage" target="_blank" href="https://www.tiktok.com/tag/carepackage?refer=embed">#CarePackage</a> <a title="giftboxideas" target="_blank" href="https://www.tiktok.com/tag/giftboxideas?refer=embed">#GiftBoxIdeas</a> <a title="snacklovers" target="_blank" href="https://www.tiktok.com/tag/snacklovers?refer=embed">#SnackLovers</a> <a title="granolabars" target="_blank" href="https://www.tiktok.com/tag/granolabars?refer=embed">#GranolaBars</a> <a title="chipsandcandy" target="_blank" href="https://www.tiktok.com/tag/chipsandcandy?refer=embed">#ChipsAndCandy</a> <a title="snacktime" target="_blank" href="https://www.tiktok.com/tag/snacktime?refer=embed">#SnackTime</a> <a title="foodgiftbox" target="_blank" href="https://www.tiktok.com/tag/foodgiftbox?refer=embed">#FoodGiftBox</a> <a title="assortedsnacks" target="_blank" href="https://www.tiktok.com/tag/assortedsnacks?refer=embed">#AssortedSnacks</a> <a title="giftingmadeeasy" target="_blank" href="https://www.tiktok.com/tag/giftingmadeeasy?refer=embed">#GiftingMadeEasy</a> <a title="snacksurprise" target="_blank" href="https://www.tiktok.com/tag/snacksurprise?refer=embed">#SnackSurprise</a> <a title="collegecarepackage" target="_blank" href="https://www.tiktok.com/tag/collegecarepackage?refer=embed">#CollegeCarePackage</a> <a title="corporategifts" target="_blank" href="https://www.tiktok.com/tag/corporategifts?refer=embed">#CorporateGifts</a> <a title="snackaddict" target="_blank" href="https://www.tiktok.com/tag/snackaddict?refer=embed">#SnackAddict</a> <a target="_blank" title="♬ Product introduction, commercials, information, summer(1284254) - yutaka.T" href="https://www.tiktok.com/music/Product-introduction-commercials-information-summer-1284254-7133249539493857281?refer=embed">♬ Product introduction, commercials, information, summer(1284254) - yutaka.T</a> </section> </blockquote>`,
+                }}
+              />
+
+              {/* Second TikTok Video */}
+              <div
+                className="tiktok-embed-container mb-8 lg:mb-0"
+                dangerouslySetInnerHTML={{
+                  __html: `<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@nut.cravings/video/7521731881373682958" data-video-id="7521731881373682958" style="max-width: 605px;min-width: 325px;"> <section> <a target="_blank" title="@nut.cravings" href="https://www.tiktok.com/@nut.cravings?refer=embed">@nut.cravings</a> Gift A Snack - Assorted Healthy Treats, Granola Bars, Chips, Candies &amp; More | Perfect for Gifting &amp; Care Packages <a title="giftasnack" target="_blank" href="https://www.tiktok.com/tag/giftasnack?refer=embed">#GiftASnack</a><a title="snackbox" target="_blank" href="https://www.tiktok.com/tag/snackbox?refer=embed">#SnackBox</a><a title="healthysnacking" target="_blank" href="https://www.tiktok.com/tag/healthysnacking?refer=embed">#HealthySnacking</a><a title="carepackage" target="_blank" href="https://www.tiktok.com/tag/carepackage?refer=embed">#CarePackage</a><a title="snacklovers" target="_blank" href="https://www.tiktok.com/tag/snacklovers?refer=embed">#SnackLovers</a><a title="giftideas" target="_blank" href="https://www.tiktok.com/tag/giftideas?refer=embed">#GiftIdeas</a><a title="snacktime" target="_blank" href="https://www.tiktok.com/tag/snacktime?refer=embed">#SnackTime</a><a title="treatyourself" target="_blank" href="https://www.tiktok.com/tag/treatyourself?refer=embed">#TreatYourself</a> <a target="_blank" title="♬ Product introduction, commercials, information, summer(1284254) - yutaka.T" href="https://www.tiktok.com/music/Product-introduction-commercials-information-summer-1284254-7133249539493857281?refer=embed">♬ Product introduction, commercials, information, summer(1284254) - yutaka.T</a> </section> </blockquote>`,
+                }}
+              />
+
+              {/* Third TikTok Video */}
+              <div
+                className="tiktok-embed-container mb-8 lg:mb-0"
+                dangerouslySetInnerHTML={{
+                  __html: `<blockquote class="tiktok-embed" cite="https://www.tiktok.com/@nut.cravings/video/7520248009863580983" data-video-id="7520248009863580983" style="max-width: 605px;min-width: 325px;"> <section> <a target="_blank" title="@nut.cravings" href="https://www.tiktok.com/@nut.cravings?refer=embed">@nut.cravings</a> Gift A Snack - Assorted Healthy Treats, Granola Bars, Chips, Candies &amp; More | Perfect for Gifting &amp; Care Packages <a title="giftasnack" target="_blank" href="https://www.tiktok.com/tag/giftasnack?refer=embed">#GiftASnack</a><a title="snackbox" target="_blank" href="https://www.tiktok.com/tag/snackbox?refer=embed">#SnackBox</a><a title="healthysnacks" target="_blank" href="https://www.tiktok.com/tag/healthysnacks?refer=embed">#HealthySnacks</a><a title="carepackage" target="_blank" href="https://www.tiktok.com/tag/carepackage?refer=embed">#CarePackage</a><a title="snackgiftbox" target="_blank" href="https://www.tiktok.com/tag/snackgiftbox?refer=embed">#SnackGiftBox</a><a title="treatyourself" target="_blank" href="https://www.tiktok.com/tag/treatyourself?refer=embed">#TreatYourself</a><a title="snacktime" target="_blank" href="https://www.tiktok.com/tag/snacktime?refer=embed">#SnackTime</a><a title="granolabars" target="_blank" href="https://www.tiktok.com/tag/granolabars?refer=embed">#GranolaBars</a><a title="snacklover" target="_blank" href="https://www.tiktok.com/tag/snacklover?refer=embed">#SnackLover</a><a title="giftingideas" target="_blank" href="https://www.tiktok.com/tag/giftingideas?refer=embed">#GiftingIdeas</a> <a title="tiktokmademebuyit" target="_blank" href="https://www.tiktok.com/tag/tiktokmademebuyit?refer=embed">#TikTokMadeMeBuyIt</a> <a target="_blank" title="♬ Cowboy Sunday - Amanda Rosa" href="https://www.tiktok.com/music/Cowboy-Sunday-7057541372371093505?refer=embed">♬ Cowboy Sunday - Amanda Rosa</a> </section> </blockquote>`,
+                }}
+              />
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
       </ErrorBoundary>
 
       {/* Final Call-to-Action Section */}
@@ -1421,7 +1727,9 @@ export default function Index() {
               {/* Enhanced Mobile swipe indicator */}
               <div className="flex flex-col items-center pt-2 pb-3 lg:hidden">
                 <div className="w-12 h-1 bg-gray-400 rounded-full mb-1"></div>
-                <span className="text-xs text-gray-500 font-medium">Swipe down to close</span>
+                <span className="text-xs text-gray-500 font-medium">
+                  Swipe down to close
+                </span>
               </div>
 
               {/* Desktop Layout: 40% Image | 60% Details */}
@@ -1446,7 +1754,8 @@ export default function Index() {
                       />
                       {/* Mobile Discount Badge */}
                       <div className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-red-600 text-white px-3 py-1.5 rounded-xl text-sm font-black shadow-lg">
-                        -{(
+                        -
+                        {(
                           ((parseFloat(
                             calculatePricing(
                               selectedProduct.price,
@@ -1463,7 +1772,8 @@ export default function Index() {
                               ).regularPrice.replace("$", ""),
                             )) *
                           100
-                        ).toFixed(0)}%
+                        ).toFixed(0)}
+                        %
                       </div>
                     </div>
                   </div>
@@ -1679,7 +1989,9 @@ export default function Index() {
                     >
                       <ShoppingCart className="w-5 h-5 sm:w-6 sm:h-6" />
                       <div className="flex flex-col">
-                        <span className="font-black text-sm sm:text-base">BUY NOW ON</span>
+                        <span className="font-black text-sm sm:text-base">
+                          BUY NOW ON
+                        </span>
                         <span className="font-black text-yellow-300 text-sm sm:text-base">
                           WALMART
                         </span>
